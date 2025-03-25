@@ -24,10 +24,11 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade nuitka
+          pip install --upgrade ttkbootstrap  # 确保安装 ttkbootstrap 依赖
 
       - name: Build executable
         run: |
-          python -m nuitka --standalone --onefile --windows-console-mode=disable --output-dir=dist --remove-output --enable-plugin=tk-inter 3.py --windows-icon-from-ico=3.ico
+          python -m nuitka --standalone --onefile --windows-console-mode=disable --output-dir=dist --remove-output --enable-plugin=tk-inter --windows-icon-from-ico=3.ico 3.py
 
       - name: Create Release
         id: create_release
