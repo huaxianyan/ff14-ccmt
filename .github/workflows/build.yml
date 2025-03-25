@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - 'v*'  # 仅在推送以 "v" 开头的标签时触发
-    # 监听提交信息中包含 "release" 的提交
     branches:
       - main  # 监听主分支的提交
   workflow_dispatch:  # 允许手动触发工作流
@@ -28,7 +27,8 @@ jobs:
 
       - name: Build executable
         run: |
-          python -m nuitka --standalone --onefile --windows-console-mode=disable --output-dir=dist --remove-output 3.py
+          set NUITKA_USE_DEPENDENCY_WALKER=0  # 禁用 Dependency Walker
+          python -m nuitka --standalone --onefile --windows-console-mode=disable --output-dir=dist --remove-output --enable-plugin=tk-inter 3.py --windows-icon-from-ico=3.ico
 
       - name: Create Release
         id: create_release
