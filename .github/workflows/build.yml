@@ -1,129 +1,44 @@
-name: Build with Nuitka
+name: Release
 
 on:
   push:
     tags:
-      - 'v*'  # 自动触发：打tag时构建
-  workflow_dispatch:  # 手动触发选项
-    inputs:
-      platform:
-        description: 'Build platform (all/windows/linux/macos)'
-        required: false
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - windows
-          - linux
-          - macos
+      - 'v*'  # 仅在推送以 "v" 开头的标签时触发
+    # 监听提交信息中包含 "release" 的提交
+    branches:
+      - main  # 监听主分支的提交
+  workflow_dispatch:  # 允许手动触发工作流
 
 jobs:
-  windows:
-    if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows' || github.event_name != 'workflow_dispatch' }}
-    runs-on: windows-latest
+  build:
+    runs-on: windows-latest  # 使用 Windows 环境
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Python
-        uses: actions/setup-python@v4
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
         with:
-          python-version: 3.12
-          
-      - name: Install Dependencies
+          python-version: '3.12'  # 设置 Python 版本
+
+      - name: Install dependencies
         run: |
           pip install nuitka
-          if exist requirements.txt pip install -r requirements.txt
-          
-      - name: Build Windows EXE
-        run: |
-          python -m nuitka --standalone --onefile ^
-            --windows-icon-from-ico=3.ico ^
-            --windows-console-mode=disable ^
-            --output-dir=dist ^
-            --remove-output ^
-            3.py
-          7z a -tzip release-windows.zip dist/*
-          
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: windows-build
-          path: release-windows.zip
 
-  linux:
-    if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'linux' || github.event_name != 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.12
-          
-      - name: Install Dependencies
+      - name: Build executable
         run: |
-          pip install nuitka
-          [ -f requirements.txt ] && pip install -r requirements.txt
-          
-      - name: Build Linux Binary
-        run: |
-          python -m nuitka --standalone --onefile \
-            --output-dir=dist \
-            --remove-output \
-            3.py
-          tar -czvf release-linux.tar.gz dist/*
-          
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: linux-build
-          path: release-linux.tar.gz
+          python -m nuitka --standalone --onefile --windows-console-mode=disable --output-dir=dist --remove-output 3.py
 
-  macos:
-    if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'macos' || github.event_name != 'workflow_dispatch' }}
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.12
-          
-      - name: Install Dependencies
-        run: |
-          pip install nuitka
-          [ -f requirements.txt ] && pip install -r requirements.txt
-          
-      - name: Build macOS App
-        run: |
-          python -m nuitka --standalone --onefile \
-            --output-dir=dist \
-            --remove-output \
-            3.py
-          tar -czvf release-macos.tar.gz dist/*
-          
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: macos-build
-          path: release-macos.tar.gz
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [windows, linux, macos]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v3
-        with:
-          path: artifacts
-          
       - name: Create Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            artifacts/windows-build/release-windows.zip
-            artifacts/linux-build/release-linux.tar.gz
-            artifacts/macos-build/release-macos.tar.gz
+          tag_name: ${{ github.ref }}  # 使用当前标签作为版本
+          files: dist/3.exe  # 指定要上传的文件
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub 提供的自动访问令牌
+
+      - name: Check for release keyword
+        if: contains(github.event.head_commit.message, 'release')
+        run: echo "Release keyword found in commit message. Proceeding with release."
