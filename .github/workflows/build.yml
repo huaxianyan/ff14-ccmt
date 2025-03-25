@@ -3,7 +3,7 @@ name: Build with Nuitka
 on:
   push:
     tags:
-      - 'v*'  # 自动触发：打 tag 时构建
+      - 'v*'  # 自动触发：打tag时构建
   workflow_dispatch:  # 手动触发选项
     inputs:
       platform:
@@ -21,25 +21,12 @@ jobs:
   build:
     strategy:
       matrix:
-        include:
-          # 根据手动输入或默认值动态包含平台
-          - ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.platform == 'windows' || github.event_name != 'workflow_dispatch' && 'windows' }}
-            os: windows-latest
-            suffix: windows
-          - ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.platform == 'linux' || github.event_name != 'workflow_dispatch' && 'linux' }}
-            os: ubuntu-latest
-            suffix: linux
-          - ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.platform == 'macos' || github.event_name != 'workflow_dispatch' && 'macos' }}
-            os: macos-latest
-            suffix: macos
-        # 自动过滤掉未启用的平台
-        exclude:
-          - ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.platform != 'all' && github.event.inputs.platform != 'windows' }}
-            os: windows-latest
-          - ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.platform != 'all' && github.event.inputs.platform != 'linux' }}
-            os: ubuntu-latest
-          - ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.platform != 'all' && github.event.inputs.platform != 'macos' }}
-            os: macos-latest
+        os: 
+          - ${{ github.event.inputs.platform == 'windows' || github.event.inputs.platform == 'all' || github.event_name != 'workflow_dispatch' && 'windows-latest' || 'skip' }}
+          - ${{ github.event.inputs.platform == 'linux' || github.event.inputs.platform == 'all' || github.event_name != 'workflow_dispatch' && 'ubuntu-latest' || 'skip' }}
+          - ${{ github.event.inputs.platform == 'macos' || github.event.inputs.platform == 'all' || github.event_name != 'workflow_dispatch' && 'macos-latest' || 'skip' }}
+      exclude:
+        - os: skip
     
     runs-on: ${{ matrix.os }}
     
@@ -65,21 +52,28 @@ jobs:
             --output-dir=dist \
             --remove-output \
             3.py
-          7z a -tzip release-${{ matrix.suffix }}.zip dist/*
+          7z a -tzip release-windows.zip dist/*
+        elif [ "${{ runner.os }}" = "Linux" ]; then
+          python -m nuitka --standalone --onefile \
+            --output-dir=dist \
+            --remove-output \
+            3.py
+          tar -czvf release-linux.tar.gz dist/*
         else
           python -m nuitka --standalone --onefile \
             --output-dir=dist \
             --remove-output \
             3.py
-          tar -czvf release-${{ matrix.suffix }}.tar.gz dist/*
+          tar -czvf release-macos.tar.gz dist/*
         fi
     
     - name: Upload Artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: ${{ matrix.suffix }}-build
+        name: ${{ runner.os }}-build
         path: |
-          release-${{ matrix.suffix }}.*
+          release-*.zip
+          release-*.tar.gz
     
     - name: Create Release
       if: startsWith(github.ref, 'refs/tags/')
