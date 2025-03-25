@@ -8,6 +8,9 @@ on:
       - main  # 监听主分支的提交
   workflow_dispatch:  # 允许手动触发工作流
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest  # 使用 Windows 环境
@@ -21,23 +24,32 @@ jobs:
         with:
           python-version: '3.12'  # 设置 Python 版本
 
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: Install Visual Studio Build Tools
+        run: |
+          choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
+          choco install windows-sdk-10.0
+
       - name: Install dependencies
         run: |
           pip install --upgrade pip
           pip install --upgrade nuitka
           pip install --upgrade ttkbootstrap
           pip install ordered-set  # Required by Nuitka
+          pip install zstandard
 
       - name: Download Dependency Walker
         run: |
           $ProgressPreference = 'SilentlyContinue'
-          mkdir -p "$env:LOCALAPPDATA\Nuitka\Nuitka\Cache\downloads\depends"
+          New-Item -Path "$env:LOCALAPPDATA\Nuitka\Nuitka\Cache\downloads\depends" -ItemType Directory -Force
           Invoke-WebRequest -Uri "https://dependencywalker.com/depends22_x64.zip" -OutFile "$env:LOCALAPPDATA\Nuitka\Nuitka\Cache\downloads\depends\depends.zip"
           Expand-Archive -Path "$env:LOCALAPPDATA\Nuitka\Nuitka\Cache\downloads\depends\depends.zip" -DestinationPath "$env:LOCALAPPDATA\Nuitka\Nuitka\Cache\downloads\depends\x86_64" -Force
 
       - name: Build executable
         run: |
-          python -m nuitka --assume-yes-for-downloads --standalone --onefile --windows-console-mode=disable --output-dir=dist --remove-output --enable-plugin=tk-inter --windows-icon-from-ico=3.ico 3.py
+          python -m nuitka --assume-yes-for-downloads --standalone --onefile --windows-console-mode=disable --output-dir=dist --remove-output --enable-plugin=tk-inter --windows-icon-from-ico=3.ico --msvc=14.3 3.py
 
       - name: Create Release
         id: create_release
