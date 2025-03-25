@@ -23,21 +23,30 @@ jobs:
 
       - name: Install dependencies
         run: |
+          pip install --upgrade pip
           pip install --upgrade nuitka
-          pip install --upgrade ttkbootstrap  # 确保安装 ttkbootstrap 依赖
+          pip install --upgrade ttkbootstrap
+          pip install ordered-set  # Required by Nuitka
+
+      - name: Download Dependency Walker
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          mkdir -p "$env:LOCALAPPDATA\Nuitka\Nuitka\Cache\downloads\depends"
+          Invoke-WebRequest -Uri "https://dependencywalker.com/depends22_x64.zip" -OutFile "$env:LOCALAPPDATA\Nuitka\Nuitka\Cache\downloads\depends\depends.zip"
+          Expand-Archive -Path "$env:LOCALAPPDATA\Nuitka\Nuitka\Cache\downloads\depends\depends.zip" -DestinationPath "$env:LOCALAPPDATA\Nuitka\Nuitka\Cache\downloads\depends\x86_64" -Force
 
       - name: Build executable
         run: |
-          python -m nuitka --standalone --onefile --windows-console-mode=disable --output-dir=dist --remove-output --enable-plugin=tk-inter --windows-icon-from-ico=3.ico 3.py
+          python -m nuitka --assume-yes-for-downloads --standalone --onefile --windows-console-mode=disable --output-dir=dist --remove-output --enable-plugin=tk-inter --windows-icon-from-ico=3.ico 3.py
 
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          tag_name: ${{ github.ref }}  # 使用当前标签作为版本
-          files: dist/3.exe  # 指定要上传的文件
+          files: dist/3.exe
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub 提供的自动访问令牌
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check for release keyword
         if: contains(github.event.head_commit.message, 'release')
