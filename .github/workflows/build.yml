@@ -23,12 +23,11 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install nuitka
+          pip install --upgrade nuitka
 
       - name: Build executable
         run: |
-          set NUITKA_USE_DEPENDENCY_WALKER=0  # 禁用 Dependency Walker
-          python -m nuitka --standalone --onefile --windows-console-mode=disable --output-dir=dist --remove-output --enable-plugin=tk-inter --no-dependency-walker 3.py --windows-icon-from-ico=3.ico
+          python -m nuitka --standalone --onefile --windows-console-mode=disable --output-dir=dist --remove-output --enable-plugin=tk-inter 3.py --windows-icon-from-ico=3.ico
 
       - name: Create Release
         id: create_release
