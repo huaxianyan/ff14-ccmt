@@ -1,0 +1,58 @@
+name: Build with Nuitka
+
+on:
+  push:
+    tags:
+      - 'v*'  # 触发条件：当打tag时自动构建（如 v1.0.0）
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]  # 多平台构建
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+    
+    - name: Install Nuitka
+      run: pip install nuitka
+    
+    - name: Build Windows Executable
+      if: runner.os == 'Windows'
+      run: |
+        python -m nuitka --standalone --onefile --windows-icon-from-ico=3.ico --windows-console-mode=disable --output-dir=dist --remove-output 3.py
+        7z a -tzip release-windows.zip dist/*
+    
+    - name: Build Linux Executable
+      if: runner.os == 'Linux'
+      run: |
+        python -m nuitka --standalone --onefile --output-dir=dist --remove-output 3.py
+        tar -czvf release-linux.tar.gz dist/*
+    
+    - name: Build MacOS Executable
+      if: runner.os == 'macOS'
+      run: |
+        python -m nuitka --standalone --onefile --output-dir=dist --remove-output 3.py
+        tar -czvf release-macos.tar.gz dist/*
+    
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ runner.os }}-build
+        path: |
+          release-*.zip
+          release-*.tar.gz
+    
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          release-*.zip
+          release-*.tar.gz
