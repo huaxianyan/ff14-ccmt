@@ -7,7 +7,7 @@ on:
   workflow_dispatch:  # 手动触发选项
     inputs:
       platform:
-        description: 'Target platform (all/windows/linux/macos)'
+        description: 'Build platform (all/windows/linux/macos)'
         required: false
         default: 'all'
         type: choice
@@ -18,66 +18,112 @@ on:
           - macos
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        os: 
-          - ${{ github.event.inputs.platform == 'windows' || github.event.inputs.platform == 'all' || github.event_name != 'workflow_dispatch' && 'windows-latest' || 'skip' }}
-          - ${{ github.event.inputs.platform == 'linux' || github.event.inputs.platform == 'all' || github.event_name != 'workflow_dispatch' && 'ubuntu-latest' || 'skip' }}
-          - ${{ github.event.inputs.platform == 'macos' || github.event.inputs.platform == 'all' || github.event_name != 'workflow_dispatch' && 'macos-latest' || 'skip' }}
-      exclude:
-        - os: skip
-    
-    runs-on: ${{ matrix.os }}
-    
+  windows:
+    if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'windows' || github.event_name != 'workflow_dispatch' }}
+    runs-on: windows-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.12'
-    
-    - name: Install dependencies
-      run: |
-        pip install nuitka
-        [ -f requirements.txt ] && pip install -r requirements.txt || echo "No requirements.txt"
-    
-    - name: Build Executable
-      run: |
-        if [ "${{ runner.os }}" = "Windows" ]; then
-          python -m nuitka --standalone --onefile \
-            --windows-icon-from-ico=3.ico \
-            --windows-console-mode=disable \
-            --output-dir=dist \
-            --remove-output \
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+          
+      - name: Install Dependencies
+        run: |
+          pip install nuitka
+          if exist requirements.txt pip install -r requirements.txt
+          
+      - name: Build Windows EXE
+        run: |
+          python -m nuitka --standalone --onefile ^
+            --windows-icon-from-ico=3.ico ^
+            --windows-console-mode=disable ^
+            --output-dir=dist ^
+            --remove-output ^
             3.py
           7z a -tzip release-windows.zip dist/*
-        elif [ "${{ runner.os }}" = "Linux" ]; then
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: windows-build
+          path: release-windows.zip
+
+  linux:
+    if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'linux' || github.event_name != 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+          
+      - name: Install Dependencies
+        run: |
+          pip install nuitka
+          [ -f requirements.txt ] && pip install -r requirements.txt
+          
+      - name: Build Linux Binary
+        run: |
           python -m nuitka --standalone --onefile \
             --output-dir=dist \
             --remove-output \
             3.py
           tar -czvf release-linux.tar.gz dist/*
-        else
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: linux-build
+          path: release-linux.tar.gz
+
+  macos:
+    if: ${{ github.event.inputs.platform == 'all' || github.event.inputs.platform == 'macos' || github.event_name != 'workflow_dispatch' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+          
+      - name: Install Dependencies
+        run: |
+          pip install nuitka
+          [ -f requirements.txt ] && pip install -r requirements.txt
+          
+      - name: Build macOS App
+        run: |
           python -m nuitka --standalone --onefile \
             --output-dir=dist \
             --remove-output \
             3.py
           tar -czvf release-macos.tar.gz dist/*
-        fi
-    
-    - name: Upload Artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: ${{ runner.os }}-build
-        path: |
-          release-*.zip
-          release-*.tar.gz
-    
-    - name: Create Release
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          release-*
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: macos-build
+          path: release-macos.tar.gz
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [windows, linux, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/windows-build/release-windows.zip
+            artifacts/linux-build/release-linux.tar.gz
+            artifacts/macos-build/release-macos.tar.gz
