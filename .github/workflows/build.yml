@@ -3,13 +3,29 @@ name: Build with Nuitka
 on:
   push:
     tags:
-      - 'v*'  # 触发条件：当打tag时自动构建（如 v1.0.0）
+      - 'v*'  # 自动触发：打 tag 时构建
+  workflow_dispatch:  # 手动触发选项
+    inputs:
+      platform:
+        description: 'Target platform (留空则构建所有平台)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - windows
+        - linux
+        - macos
 
 jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]  # 多平台构建
+        os: ${{ contains(github.event.inputs.platform, 'all') && '[windows-latest, ubuntu-latest, macos-latest]' || 
+             (github.event.inputs.platform == 'windows' && '[windows-latest]' ||
+              github.event.inputs.platform == 'linux' && '[ubuntu-latest]' ||
+              github.event.inputs.platform == 'macos' && '[macos-latest]' ||
+              '[windows-latest, ubuntu-latest, macos-latest]') }}
     runs-on: ${{ matrix.os }}
     
     steps:
@@ -20,8 +36,11 @@ jobs:
       with:
         python-version: '3.12'
     
-    - name: Install Nuitka
-      run: pip install nuitka
+    - name: Install dependencies
+      run: |
+        pip install nuitka
+        # 如果有其他依赖
+        pip install -r requirements.txt
     
     - name: Build Windows Executable
       if: runner.os == 'Windows'
