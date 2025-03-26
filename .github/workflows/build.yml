@@ -48,20 +48,34 @@ jobs:
         run: |
           python -m nuitka --assume-yes-for-downloads --standalone --windows-console-mode=disable --output-dir=dist --remove-output --enable-plugin=tk-inter --windows-icon-from-ico=3.ico --msvc=14.3 --windows-uac-admin --windows-company-name="FF14 CCMT" --windows-product-name="FF14角色配置管理工具" --windows-file-version=1.0.0 --windows-product-version=1.0.0 --windows-file-description="FF14角色配置管理工具" --disable-console --output-filename="FF14角色配置管理工具.exe" 3.py
 
-      - name: List build output
+      - name: Debug Build Output
         run: |
+          Write-Host "Current directory:"
+          pwd
+          Write-Host "`nDist directory contents:"
           Get-ChildItem -Path "dist" -Recurse
+          Write-Host "`nLooking for executable:"
+          Get-ChildItem -Path "dist" -Recurse -Filter "*.exe"
 
       - name: Prepare Release Files
         run: |
           # 创建发布目录
           mkdir release
-          # 复制主程序
-          Copy-Item "dist/3.dist/3.exe" -Destination "release/FF14角色配置管理工具.exe"
-          # 复制依赖文件夹
-          Copy-Item "dist/3.dist/*" -Destination "release/" -Recurse -Exclude "3.exe"
-          # 创建 ZIP 文件
-          Compress-Archive -Path "release/*" -DestinationPath "FF14角色配置管理工具.zip" -Force
+          # 查找可执行文件
+          $exePath = Get-ChildItem -Path "dist" -Recurse -Filter "*.exe" | Select-Object -First 1
+          if ($exePath) {
+            Write-Host "Found executable at: $($exePath.FullName)"
+            # 复制主程序
+            Copy-Item $exePath.FullName -Destination "release/FF14角色配置管理工具.exe"
+            # 复制依赖文件夹
+            $distFolder = $exePath.Directory
+            Copy-Item "$($distFolder.FullName)/*" -Destination "release/" -Recurse -Exclude "*.exe"
+            # 创建 ZIP 文件
+            Compress-Archive -Path "release/*" -DestinationPath "FF14角色配置管理工具.zip" -Force
+          } else {
+            Write-Host "No executable found in dist directory!"
+            exit 1
+          }
 
       - name: Create Release
         id: create_release
